@@ -1,10 +1,15 @@
 package route;
 
+/**
+ * 路由中参数名称和参数值。
+ *
+ * @author wangyongshan
+ */
 public class Param {
     private String key;
     private String value;
 
-    public Param(String key, String value) {
+    Param(String key, String value) {
         this.key = key;
         this.value = value;
     }
@@ -15,14 +20,6 @@ public class Param {
 
     public String getValue() {
         return value;
-    }
-
-    public void setKey(String key) {
-        this.key = key;
-    }
-
-    public void setValue(String value) {
-        this.value = value;
     }
 
     @Override

@@ -1,7 +1,14 @@
 package route;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
+/**
+ * 测试用例。
+ *
+ * @author wangyongshan
+ */
 public class ExampleTest {
 
     public static void main(String[] args) {
@@ -19,6 +26,7 @@ public class ExampleTest {
         testTreeRootTrailingSlashRedirect();
         testRedirectTrailingSlash();
         testTreeFindCaseInsensitivePath();
+        testPerformance();
     }
 
     private static void testTreeAddAndGet() {
@@ -56,7 +64,7 @@ public class ExampleTest {
         };
 
         for (Object[] check : checks) {
-            NodeValue matched = tree.getValue((String)check[0], new ArrayList<>(), new ArrayList<>(), false);
+            RouteInfo matched = tree.getValue((String)check[0], new Params(), new ArrayList<>(), false);
             if (!String.valueOf(check[2]).equals(matched.fullPath)) {
                 throw new RuntimeException("测试失败："+ check[0]);
             }
@@ -250,7 +258,7 @@ public class ExampleTest {
             String route = (String) check[2];
             String params = (String) check[3];
 
-            NodeValue matched = tree.getValue(path, new ArrayList<>(), new ArrayList<>(), false);
+            RouteInfo matched = tree.getValue(path, new Params(), new ArrayList<>(), false);
             if (!matched.tsr && !route.equals(matched.fullPath)) {
                 throw new RuntimeException("测试失败："+ path);
             }
@@ -301,7 +309,7 @@ public class ExampleTest {
             String route = (String) check[2];
             String params = (String) check[3];
 
-            NodeValue matched = tree.getValue(path, new ArrayList<>(), new ArrayList<>(), unescape);
+            RouteInfo matched = tree.getValue(path, new Params(), new ArrayList<>(), unescape);
             if (!matched.tsr && !route.equals(matched.fullPath)) {
                 throw new RuntimeException("测试失败："+ path);
             }
@@ -461,7 +469,7 @@ public class ExampleTest {
             String route = (String) check[2];
             String params = (String) check[3];
 
-            NodeValue matched = tree.getValue(path, new ArrayList<>(), new ArrayList<>(), false);
+            RouteInfo matched = tree.getValue(path, new Params(), new ArrayList<>(), false);
             if (!matched.tsr && !route.equals(matched.fullPath)) {
                 throw new RuntimeException("测试失败："+ path);
             }
@@ -665,7 +673,7 @@ public class ExampleTest {
         };
 
         for (String path : tsrRoutes) {
-            NodeValue value = tree.getValue(path, null, new ArrayList<>(), false);
+            RouteInfo value = tree.getValue(path, null, new ArrayList<>(), false);
             if (value.handlers != null) {
                 throw new RuntimeException("Not-null handler for TSR route: "+ path);
             } else if (!value.tsr) {
@@ -687,7 +695,7 @@ public class ExampleTest {
         };
 
         for (String path : noTsrRoutes) {
-            NodeValue value = tree.getValue(path, null, new ArrayList<>(), false);
+            RouteInfo value = tree.getValue(path, null, new ArrayList<>(), false);
             if (value.handlers != null) {
                 throw new RuntimeException("Not-null handler for TSR route: "+ path);
             } else if (value.tsr) {
@@ -710,7 +718,7 @@ public class ExampleTest {
             throw new RuntimeException("不应该抛出异常的：/:test");
         }
 
-        NodeValue value = tree.getValue("/", null, new ArrayList<>(), false);
+        RouteInfo value = tree.getValue("/", null, new ArrayList<>(), false);
         if (value.handlers != null) {
             throw new RuntimeException("Not-null handler");
         }
@@ -732,7 +740,7 @@ public class ExampleTest {
             tree.addRoute(route, new HandlersChain() {});
         }
 
-        NodeValue value = tree.getValue("/hello/abx/", new ArrayList<>(), new ArrayList<>(), false);
+        RouteInfo value = tree.getValue("/hello/abx/", new Params(), new ArrayList<>(), false);
         if (value.tsr != true) {
             throw new RuntimeException("want true, is false");
         }
@@ -918,4 +926,65 @@ public class ExampleTest {
         }
     }
 
+
+    private static void testPerformance() {
+        RouteNode root = new RouteNode();
+
+        int numberOfURLs = 100000; // 要生成的随机 URL 地址数量
+        Random random = new Random();
+        for (int i = 0; i < numberOfURLs; i++) {
+            int numberOfSegments = random.nextInt(4) + 2; // 生成 2 到 5 之间的随机数作为分段数量
+            StringBuilder urlBuilder = new StringBuilder();
+
+            // 生成每个分段
+            for (int j = 0; j < numberOfSegments; j++) {
+                String segment = generateRandomWord(random.nextInt(6) + 3); // 生成长度为 3 到 8 之间的随机单词
+                urlBuilder.append("/").append(segment);
+            }
+
+            // 输出生成的随机 URL 地址
+            root.addRoute(urlBuilder.toString(), new HandlersChain() {});
+
+            if (i % 100 == 0) {
+                root.addRoute("/books_"+ i, new HandlersChain() {});
+                root.addRoute("/books_"+ i + "/:bookId", new HandlersChain() {});
+                root.addRoute(urlBuilder.append("/:param_").append(i).toString(), new HandlersChain() {});
+            }
+        }
+
+        root.addRoute("/users", new HandlersChain() {});
+        root.addRoute("/users/:userId", new HandlersChain() {});
+
+        List<SkippedNode> skippedNodes = new ArrayList<>();
+        long s = System.currentTimeMillis();
+        RouteInfo value = root.getValue("/users", new Params(), skippedNodes, false);
+        System.out.println(value);
+        value = root.getValue("/users/9988", new Params(), skippedNodes, false);
+        System.out.println(value);
+        value = root.getValue("/books_"+ 2, new Params(), skippedNodes, false);
+        System.out.println(value);
+        value = root.getValue("/books_"+ 100, new Params(), skippedNodes, false);
+        System.out.println(value);
+        value = root.getValue("/books_"+ 100 + "/1020", new Params(), skippedNodes, false);
+        System.out.println(value);
+        value = root.getValue("/books_"+ 500, new Params(), skippedNodes, false);
+        System.out.println(value);
+        System.out.println(String.format("随机注册了 %d 个路由，执行路由匹配耗时：%d ms", numberOfURLs, System.currentTimeMillis() - s));
+    }
+
+    // 生成随机单词
+    private static String generateRandomWord(int length) {
+        Random random = new Random();
+        StringBuilder wordBuilder = new StringBuilder();
+        // 字母表
+        String alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int i = 0; i < length; i++) {
+            // 生成随机索引，范围是 0 到 字母表长度 - 1
+            int index = random.nextInt(alphabet.length());
+            // 从字母表中取出对应索引的字母，并添加到 StringBuilder 中
+            wordBuilder.append(alphabet.charAt(index));
+        }
+        // 返回随机单词
+        return wordBuilder.toString();
+    }
 }

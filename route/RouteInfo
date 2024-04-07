@@ -1,37 +1,43 @@
 package route;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class NodeValue {
+/**
+ * 匹配的路由信息。
+ *
+ * @author wangyongshan
+ */
+public class RouteInfo {
+    String method = "";
     String fullPath = "";
-    List<Param> params = new ArrayList<>();
+    Params params = new Params();
     HandlersChain handlers;
     boolean tsr;
 
-    NodeValue() {
+    RouteInfo() {
     }
 
-    // Getters and setters
+    public String getPath() {
+        return fullPath;
+    }
+
+    public Params getParams() {
+        return params;
+    }
+
     public HandlersChain getHandlers() {
         return handlers;
-    }
-
-    public List<Param> getParams() {
-        return params;
     }
 
     public boolean isTsr() {
         return tsr;
     }
 
-    public String getFullPath() {
-        return fullPath;
+    public String getMethod() {
+        return method;
     }
 
     @Override
     public String toString() {
-        return "NodeValue{" +
+        return "RouteInfo{" +
             "fullPath='" + fullPath + '\'' +
             ", params=" + params +
             ", tsr=" + tsr +

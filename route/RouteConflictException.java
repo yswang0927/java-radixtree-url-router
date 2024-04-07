@@ -2,28 +2,15 @@ package route;
 
 /**
  * 路由冲突异常
+ *
+ * @author wangyongshan
  */
-public class RouteConflictException extends RuntimeException {
+public class RouteConflictException extends RouteSyntaxException {
     public RouteConflictException() {
         super();
     }
 
     public RouteConflictException(String message) {
         super(message);
-    }
-
-    @Override
-    public synchronized Throwable initCause(Throwable cause) {
-        return null;
-    }
-
-    @Override
-    public synchronized Throwable fillInStackTrace() {
-        return null;
-    }
-
-    @Override
-    public void setStackTrace(StackTraceElement[] stackTrace) {
-        // ignore
     }
 }

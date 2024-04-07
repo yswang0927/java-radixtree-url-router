@@ -17,8 +17,8 @@ public class RouteNode {
     boolean wildChild = false;
     NodeType nType = NodeType.STATIC;
     int priority = 0;
-    HandlersChain handlers;
     String fullPath = "";
+    HandlersChain handlers;
     List<RouteNode> children = new ArrayList<>();
 
     RouteNode() {}
@@ -324,9 +324,9 @@ public class RouteNode {
         return new FoundWildcard("", -1, false);
     }
 
-    public NodeValue getValue(String path, List<Param> params, List<SkippedNode> skippedNodes, boolean unescape) {
+    public RouteInfo getValue(String path, Params params, List<SkippedNode> skippedNodes, boolean unescape) {
+        RouteInfo value = new RouteInfo();
         int globalParamsCount = 0;
-        NodeValue value = new NodeValue();
 
         RouteNode n = this;
         // Outer loop for walking the tree
@@ -412,7 +412,7 @@ public class RouteNode {
                                         // ignore
                                     }
                                 }
-                                value.params.add(new Param(n.path.substring(1), val));
+                                value.params.addParam(n.path.substring(1), val);
                             }
 
                             if (end < path.length()) {
@@ -450,7 +450,7 @@ public class RouteNode {
                                         // ignore
                                     }
                                 }
-                                value.params.add(new Param(n.path.substring(2), val));
+                                value.params.addParam(n.path.substring(2), val);
                             }
                             value.handlers = n.handlers;
                             value.fullPath = n.fullPath;
@@ -535,6 +535,10 @@ public class RouteNode {
 
             return value;
         }
+    }
+
+    public RouteInfo getValue(String path, boolean unescape) {
+        return this.getValue(path, new Params(), new ArrayList<>(), unescape);
     }
 
     public String findCaseInsensitivePath(String path, boolean fixTrailingSlash) {
@@ -748,6 +752,19 @@ public class RouteNode {
 
     public void setFullPath(String fullPath) {
         this.fullPath = fullPath;
+    }
+
+    @Override
+    public String toString() {
+        return "RouteNode{" +
+            "path='" + path + '\'' +
+            ", indices='" + indices + '\'' +
+            ", wildChild=" + wildChild +
+            ", nType=" + nType +
+            ", priority=" + priority +
+            ", fullPath='" + fullPath + '\'' +
+            ", childrenSize=" + children.size() +
+            '}';
     }
 
     static class FoundWildcard {

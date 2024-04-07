@@ -1,5 +1,8 @@
 package route;
 
+/**
+ * @author wangyongshan
+ */
 public class SkippedNode {
     String path;
     RouteNode node;
@@ -24,4 +27,14 @@ public class SkippedNode {
     public int getParamsCount() {
         return paramsCount;
     }
+
+    @Override
+    public String toString() {
+        return "SkippedNode{" +
+            "path='" + path + '\'' +
+            ", node=" + node +
+            ", paramsCount=" + paramsCount +
+            '}';
+    }
 }
+

@@ -6,8 +6,27 @@ import java.util.concurrent.ConcurrentMap;
 
 /**
  * URL路由器，用于注册URL路由和匹配URL路由。
+ *
+ * @author wangyongshan
  */
 public class Router {
+    public static final String HTTP_METHOD_GET = "GET";
+    public static final String HTTP_METHOD_POST = "POST";
+    public static final String HTTP_METHOD_PUT = "PUT";
+    public static final String HTTP_METHOD_DELETE = "DELETE";
+    public static final String HTTP_METHOD_HEAD = "HEAD";
+    public static final String HTTP_METHOD_OPTIONS = "OPTIONS";
+    public static final String HTTP_METHOD_PATCH = "PATCH";
+    public static final String HTTP_METHOD_TRACE = "TRACE";
+    public static final String HTTP_METHOD_CONNECT = "CONNECT";
+
+    private static final String[] ANY_HTTP_METHODS = {
+        HTTP_METHOD_GET, HTTP_METHOD_POST,
+        HTTP_METHOD_PUT, HTTP_METHOD_DELETE,
+        HTTP_METHOD_HEAD, HTTP_METHOD_OPTIONS,
+        HTTP_METHOD_PATCH, HTTP_METHOD_TRACE,
+        HTTP_METHOD_CONNECT
+    };
 
     private ConcurrentMap<String, RouteNode> routesMap = new ConcurrentHashMap<>();
 
@@ -38,13 +57,48 @@ public class Router {
                 return rootNode;
             });
         }
-        
+
         root.addRoute(routePath, handlers);
 
         return this;
     }
 
-    public NodeValue matchRoute(String httpMethod, String requestUrl) {
+    public Router get(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_GET, routePath, handlers);
+    }
+
+    public Router post(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_POST, routePath, handlers);
+    }
+
+    public Router put(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_PUT, routePath, handlers);
+    }
+
+    public Router delete(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_DELETE, routePath, handlers);
+    }
+
+    public Router options(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_OPTIONS, routePath, handlers);
+    }
+
+    public Router head(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_HEAD, routePath, handlers);
+    }
+
+    public Router patch(String routePath, HandlersChain handlers) {
+        return this.addRoute(HTTP_METHOD_PATCH, routePath, handlers);
+    }
+
+    public Router any(String routePath, HandlersChain handlers) {
+        for (String method : ANY_HTTP_METHODS) {
+            this.addRoute(method, routePath, handlers);
+        }
+        return this;
+    }
+
+    public RouteInfo match(String httpMethod, String requestUrl) {
         if (httpMethod == null || httpMethod.isEmpty()) {
             throw new RouteSyntaxException("HTTP method can not be empty");
         }
@@ -58,8 +112,13 @@ public class Router {
             return null;
         }
 
-        return root.getValue(requestUrl, new ArrayList<>(), new ArrayList<>(), false);
-    }
+        RouteInfo routeInfo = root.getValue(requestUrl, new Params(), new ArrayList<>(), false);
+        if (routeInfo.isTsr() || routeInfo.handlers == null) {
+            return null;
+        }
 
+        routeInfo.method = httpMethod;
+        return routeInfo;
+    }
 
 }
