@@ -12,6 +12,7 @@ public class ExampleTest {
         testTreeChildConflict();
         testTreeDuplicatePath();
         testEmptyWildcardName();
+        testTreeCatchAllConflict();
         testTreeCatchAllConflictRoot();
         testTreeDoubleWildcard();
         testTreeTrailingSlashRedirect();
@@ -494,6 +495,40 @@ public class ExampleTest {
 
     }
 
+    private static void testTreeCatchAllConflict() {
+        Object[][] routes = {
+            // [route, conflict]
+            {"/src/*filepath/x", true},
+            {"/src2/", false},
+            {"/src2/*filepath/x", true},
+            {"/src3/*filepath", false},
+            {"/src3/*filepath/x", true},
+        };
+
+        RouteNode tree = new RouteNode();
+
+        for (Object[] route : routes) {
+            String path = (String) route[0];
+            boolean conflict = (boolean) route[1];
+
+            Exception exp = null;
+            try {
+                tree.addRoute(path, null);
+            } catch (Exception e) {
+                exp = e;
+            }
+
+            if (conflict) {
+                if (exp == null) {
+                    throw new RuntimeException(String.format("路由<%s>应该无效且抛出异常的，但是没有抛出异常", path));
+                }
+            } else if (exp != null) {
+                throw new RuntimeException(String.format("路由<%s>应该正确的，但是却抛出了异常", path));
+            }
+        }
+
+    }
+
     private static void testTreeCatchAllConflictRoot() {
         Object[][] checks = {
             {"/", false},
@@ -704,26 +739,6 @@ public class ExampleTest {
     }
 
     private static void testTreeFindCaseInsensitivePath() {
-        String[] routes = {
-            "/hi",
-            "/Π"
-        };
-        RouteNode tree = new RouteNode();
-        for (String route : routes) {
-            tree.addRoute(route, new HandlersChain() {});
-        }
-        for (String path : routes) {
-            String foundPath = tree.findCaseInsensitivePath(path, true);
-            if (foundPath == null) {
-                throw new RuntimeException("Route <"+ path +"> not found!");
-            }
-            if (!path.equals(foundPath)) {
-                throw new RuntimeException(String.format("Wrong result for route '%s': %s", path, foundPath));
-            }
-        }
-    }
-
-    private static void testTreeFindCaseInsensitivePath2() {
         RouteNode tree = new RouteNode();
 
         String longPath = "/l" + "o".repeat(128) + "ng";
@@ -762,6 +777,7 @@ public class ExampleTest {
             "/w/♭/", // 3 byte, last byte differs
             "/w/𠜎",  // 4 byte
             "/w/𠜏/", // 4 byte
+            "/lang/简体中文",
             longPath
         };
 
@@ -781,6 +797,9 @@ public class ExampleTest {
         // Check out == in for all registered routes
         // With fixTrailingSlash = true
         for (String path : routes) {
+            if (path.startsWith("/search/")) {
+                System.out.println("");
+            }
             String foundPath = tree.findCaseInsensitivePath(path, true);
             if (foundPath == null) {
                 throw new RuntimeException("Route <"+ path +"> not found!");
@@ -858,6 +877,8 @@ public class ExampleTest {
             {"/w/♭", "/w/♭/", true, true},
             {"/w/𠜎/", "/w/𠜎", true, true},
             {"/w/𠜏", "/w/𠜏/", true, true},
+            {"/lang/简体中文", "/lang/简体中文", true, false},
+            {"/lang/简体中文/", "/lang/简体中文", true, true},
             {lOngPath, longPath, true, true}
         };
 

@@ -3,11 +3,10 @@ package route;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
- * 翻译自：https://github.com/gin-gonic/gin/blob/master/tree.go
+ * 翻译自：https://github.com/gin-gonic/gin/blob/master/tree.go(v1.9.1)
  *
  * @author wangyongshan
  * @version 1.9.1
@@ -416,7 +415,7 @@ public class RouteNode {
                                 String val = path.substring(0, end);
                                 if (unescape) {
                                     try {
-                                        val = URLDecoder.decode(val, StandardCharsets.UTF_8);
+                                        val = URLDecoder.decode(val, StandardCharsets.UTF_8.name());
                                     } catch (Exception e) {
                                         // ignore
                                     }
@@ -454,7 +453,7 @@ public class RouteNode {
                                 String val = path;
                                 if (unescape) {
                                     try {
-                                        val = URLDecoder.decode(val, StandardCharsets.UTF_8);
+                                        val = URLDecoder.decode(val, StandardCharsets.UTF_8.name());
                                     } catch (Exception e) {
                                         // ignore
                                     }
@@ -548,11 +547,11 @@ public class RouteNode {
     }
 
     public String findCaseInsensitivePath(String path, boolean fixTrailingSlash) {
-        return findCaseInsensitivePathRec(path, "", new byte[4], fixTrailingSlash);
+        return findCaseInsensitivePathRec(path, "", fixTrailingSlash);
     }
 
     // Recursive case-insensitive lookup function used by n.findCaseInsensitivePath
-    private String findCaseInsensitivePathRec(String path, String ciPath, byte[] rb, boolean fixTrailingSlash) {
+    private String findCaseInsensitivePathRec(String path, String ciPath, boolean fixTrailingSlash) {
         RouteNode n = this;
         int npLen = n.path.length();
 
@@ -593,73 +592,32 @@ public class RouteNode {
             // we can just look up the next child node and continue to walk down
             // the tree
             if (!n.wildChild) {
-                rb = shiftNRuneBytes(rb, npLen);
+                char rv = oldPath.charAt(npLen);
+                char lo = Character.toLowerCase(rv);
 
-                if (rb[0] != 0) {
-                    // Old rune not finished
-                    char idxc = (char) rb[0];
-                    for (int i = 0; i < n.indices.length(); i++) {
-                        if (idxc == n.indices.charAt(i)) {
-                            // continue with child node
+                for (int i = 0, len = n.indices.length(); i < len; ++i) {
+                    // Lowercase matches
+                    if (n.indices.charAt(i) == lo) {
+                        // must use a recursive approach since both the
+                        // uppercase byte and the lowercase byte might exist as an index
+                        String out = n.children.get(i).findCaseInsensitivePathRec(path, ciPath, fixTrailingSlash);
+                        if (out != null) {
+                            return out;
+                        }
+                        break;
+                    }
+                }
+
+                // If we found no match, the same for the uppercase, if it differs
+                char up = Character.toUpperCase(rv);
+                if (up != lo) {
+                    for (int i = 0, len = n.indices.length(); i < len; ++i) {
+                        // Uppercase matches
+                        if (n.indices.charAt(i) == up) {
+                            // Continue with child node
                             n = n.children.get(i);
                             npLen = n.path.length();
                             continue walk;
-                        }
-                    }
-                } else {
-                    // Process a new rune
-                    char rv = '\u0000';
-
-                    // Find rune start.
-                    // Runes are up to 4 byte long,
-                    // -4 would definitely be another rune.
-                    int off = 0;
-                    for (int max = Math.min(npLen, 3); off < max; off++) {
-                        int i = npLen - off;
-                        if (isRuneStart(firstByteValue(oldPath.charAt(i)))) {
-                            // read rune from cached path
-                            rv = oldPath.charAt(i);
-                            break;
-                        }
-                    }
-
-                    // Calculate lowercase bytes of current rune
-                    char lo = Character.toLowerCase(rv);
-                    Utils.encodeRune(rb, lo);
-
-                    rb = shiftNRuneBytes(rb, off);
-
-                    char idxc = (char) rb[0];
-                    for (int i = 0; i < n.indices.length(); i++) {
-                        // Lowercase matches
-                        if (n.indices.charAt(i) == idxc) {
-                            // must use a recursive approach since both the
-                            // uppercase byte and the lowercase byte might exist
-                            // as an index
-                            String out = n.children.get(i).findCaseInsensitivePathRec(path, ciPath, rb, fixTrailingSlash);
-                            if (out != null) {
-                                return out;
-                            }
-                            break;
-                        }
-                    }
-
-                    // If we found no match, the same for the uppercase rune,
-                    // if it differs
-                    char up = Character.toUpperCase(rv);
-                    if (up != lo) {
-                        Utils.encodeRune(rb, up);
-                        rb = shiftNRuneBytes(rb, off);
-
-                        idxc = (char) rb[0];
-                        for (int i = 0; i < n.indices.length(); i++) {
-                            // Uppercase matches
-                            if (n.indices.charAt(i) == idxc) {
-                                // Continue with child node
-                                n = n.children.get(i);
-                                npLen = n.path.length();
-                                continue walk;
-                            }
                         }
                     }
                 }
@@ -693,7 +651,6 @@ public class RouteNode {
                             path = path.substring(end);
                             continue;
                         }
-
                         // ... but we can't
                         if (fixTrailingSlash && path.length() == end + 1) {
                             return ciPath;
@@ -709,7 +666,7 @@ public class RouteNode {
                         // No handle found. Check if a handle for this path + a
                         // trailing slash exists
                         n = n.children.get(0);
-                        if (n.path.equals("/") && n.handlers != null) {
+                        if ("/".equals(n.path) && n.handlers != null) {
                             return ciPath + '/';
                         }
                     }
@@ -731,51 +688,11 @@ public class RouteNode {
             int pLen = path.length();
             if (pLen + 1 == npLen && n.path.charAt(pLen) == '/' &&
                 path.substring(1).equalsIgnoreCase(n.path.substring(1, pLen)) && n.handlers != null) {
-                return ciPath.concat(path);
+                return ciPath.concat(n.path);
             }
         }
+
         return null;
-    }
-
-    private static byte[] shiftNRuneBytes(byte[] rb, int n) {
-        byte[] result = new byte[4];
-        switch (n) {
-            case 0:
-                result = rb;
-                break;
-            case 1:
-                result[0] = rb[1];
-                result[1] = rb[2];
-                result[2] = rb[3];
-                result[3] = 0;
-                break;
-            case 2:
-                result[0] = rb[2];
-                result[1] = rb[3];
-                result[2] = 0;
-                result[3] = 0;
-                break;
-            case 3:
-                result[0] = rb[3];
-                result[1] = 0;
-                result[2] = 0;
-                result[3] = 0;
-                break;
-            default:
-                break;
-        }
-        return result;
-    }
-
-    private static boolean isRuneStart(int b) {
-        // 判断字节的最高位是否为0，如果为0，则为ASCII字符，也是UTF-8编码的Unicode字符的起始字节
-        return (b & 0x80) == 0x00 || (b & 0xC0) == 0xC0;
-    }
-
-    private static int firstByteValue(char c) {
-        byte[] utf8Bytes = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
-        // 取出第一个字节的值
-        return utf8Bytes[0] & 0xFF;
     }
 
     public String getPath() {
