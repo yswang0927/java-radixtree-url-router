@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 翻译自：https://github.com/gin-gonic/gin/blob/master/tree.go(v1.9.1)
+ * 翻译自：https://github.com/gin-gonic/gin/blob/master/tree.go
  *
  * @author wangyongshan
  * @version 1.9.1
@@ -17,12 +17,11 @@ public class RouteNode {
     boolean wildChild = false;
     NodeType nType = NodeType.STATIC;
     int priority = 0;
-    List<RouteNode> children = new ArrayList<>();
     HandlersChain handlers;
     String fullPath = "";
+    List<RouteNode> children = new ArrayList<>();
 
-    RouteNode() {
-    }
+    RouteNode() {}
 
     RouteNode(String path, String indices, boolean wildChild, NodeType nType, int priority,
                      List<RouteNode> children, HandlersChain handlers, String fullPath) {
@@ -70,7 +69,6 @@ public class RouteNode {
             // This also implies that the common prefix contains no ':' or '*'
             // since the existing key can't contain those chars.
             int i = longestCommonPrefix(path, n.path);
-
             // Split edge
             if (i < n.path.length()) {
                 RouteNode child = new RouteNode(
@@ -86,7 +84,6 @@ public class RouteNode {
 
                 n.children = new ArrayList<>();
                 n.children.add(child);
-
                 n.indices = String.valueOf(n.path.charAt(i));
                 n.path = path.substring(0, i);
                 n.handlers = null;
@@ -108,7 +105,7 @@ public class RouteNode {
                 }
 
                 // Check if a child with the next path byte exists
-                for (int j = 0, max = n.indices.length(); j < max; j++) {
+                for (int j = 0, max = n.indices.length(); j < max; ++j) {
                     if (c == n.indices.charAt(j)) {
                         parentFullPathIndex += n.path.length();
                         j = n.incrementChildPrio(j);
@@ -125,6 +122,7 @@ public class RouteNode {
                     n.addChild(child);
                     n.incrementChildPrio(n.indices.length() - 1);
                     n = child;
+
                 } else if (n.wildChild) {
                     // inserting a wildcard node, need to check if it conflicts with the existing wildcard
                     n = n.children.get(n.children.size() - 1);
@@ -144,7 +142,6 @@ public class RouteNode {
                     if (n.nType != NodeType.CATCH_ALL) {
                         pathSeg = path.split("/", 2)[0];
                     }
-
                     String prefix = fullPath.substring(0, fullPath.indexOf(pathSeg)) + n.path;
                     throw new RouteConflictException(String.format("'%s' in new path '%s' conflicts with existing wildcard '%s' in existing prefix '%s'", pathSeg, fullPath, n.path, prefix));
                 }
@@ -155,7 +152,7 @@ public class RouteNode {
 
             // Otherwise add handle to current node
             if (n.handlers != null) {
-                throw new RuntimeException("handlers are already registered for path '" + fullPath + "'");
+                throw new RouteConflictException("handlers are already registered for path '" + fullPath + "'");
             }
             n.handlers = handlers;
             n.fullPath = fullPath;
@@ -167,7 +164,6 @@ public class RouteNode {
         List<RouteNode> cs = this.children;
         cs.get(pos).priority++;
         int prio = cs.get(pos).getPriority();
-
         // Adjust position (move to front)
         int newPos = pos;
         for (; newPos > 0 && cs.get(newPos - 1).getPriority() < prio; newPos--) {
@@ -200,15 +196,15 @@ public class RouteNode {
             if (i < 0) { // No wildcard found
                 break;
             }
+
             // The wildcard name must only contain one ':' or '*' character
             if (!valid) {
-                throw new RuntimeException("only one wildcard per path segment is allowed, has: '" +
-                    wildcard + "' in path '" + fullPath + "'");
+                throw new RouteSyntaxException(String.format("only one wildcard per path segment is allowed, has: '%s' in path '%s'", wildcard, fullPath));
             }
 
             // check if the wildcard has a name
             if (wildcard.length() < 2) {
-                throw new RuntimeException("wildcards must be named with a non-empty name in path '" + fullPath + "'");
+                throw new RouteSyntaxException(String.format("wildcards must be named with a non-empty name in path '%s'", fullPath));
             }
 
             if (wildcard.charAt(0) == ':') { // param
@@ -231,7 +227,6 @@ public class RouteNode {
                 // will be another subpath starting with '/'
                 if (wildcard.length() < path.length()) {
                     path = path.substring(wildcard.length());
-
                     child = new RouteNode();
                     child.priority = 1;
                     child.fullPath = fullPath;
@@ -247,7 +242,7 @@ public class RouteNode {
 
             // catchAll
             if (i + wildcard.length() != path.length()) {
-                throw new RuntimeException("catch-all routes are only allowed at the end of the path in path '" + fullPath + "'");
+                throw new RouteSyntaxException(String.format("catch-all routes are only allowed at the end of the path in path '%s'", fullPath));
             }
 
             if (!n.path.isEmpty() && n.path.charAt(n.path.length() - 1) == '/') {
@@ -255,17 +250,14 @@ public class RouteNode {
                 if (!n.children.isEmpty()) {
                     pathSeg = n.children.get(0).path.split("/", 2)[0];
                 }
-                throw new RuntimeException("catch-all wildcard '" + path +
-                    "' in new path '" + fullPath +
-                    "' conflicts with existing path segment '" + pathSeg +
-                    "' in existing prefix '" + n.path + pathSeg +
-                    "'");
+                throw new RouteConflictException(String.format("catch-all wildcard '%s' in new path '%s' conflicts with existing path segment '%s in existing prefix '%s%s'",
+                    path, fullPath, pathSeg, n.path, pathSeg));
             }
 
             // currently fixed width 1 for '/'
             i--;
             if (path.charAt(i) != '/') {
-                throw new RuntimeException("no / before catch-all in path '" + fullPath + "'");
+                throw new RouteSyntaxException(String.format("no / before catch-all in path '%s'", fullPath));
             }
 
             n.path = path.substring(0, i);
@@ -275,22 +267,21 @@ public class RouteNode {
             child.wildChild = true;
             child.nType = NodeType.CATCH_ALL;
             child.fullPath = fullPath;
-
             n.addChild(child);
             n.indices = "/";
             n = child;
             n.priority++;
 
             // second node: node holding the variable
-            child = new RouteNode();
-            child.path = path.substring(i);
-            child.nType = NodeType.CATCH_ALL;
-            child.handlers = handlers;
-            child.priority = 1;
-            child.fullPath = fullPath;
+            RouteNode child2 = new RouteNode();
+            child2.path = path.substring(i);
+            child2.nType = NodeType.CATCH_ALL;
+            child2.handlers = handlers;
+            child2.priority = 1;
+            child2.fullPath = fullPath;
 
             n.children = new ArrayList<>();
-            n.children.add(child);
+            n.children.add(child2);
             return;
         }
 
@@ -303,7 +294,9 @@ public class RouteNode {
     private static int longestCommonPrefix(String path, String nodePath) {
         int minLen = Math.min(path.length(), nodePath.length());
         int i = 0;
-        for (; i < minLen && path.charAt(i) == nodePath.charAt(i); i++) ;
+        for (; i < minLen && path.charAt(i) == nodePath.charAt(i); i++) {
+            // ignore
+        }
         return i;
     }
 
@@ -344,10 +337,9 @@ public class RouteNode {
             if (path.length() > prefixLen) {
                 if (path.substring(0, prefixLen).startsWith(prefix)) {
                     path = path.substring(prefixLen);
-
                     // Try all the non-wildcard children first by matching the indices
                     char idxc = path.charAt(0);
-                    for (int i = 0, iLen = n.indices.length(); i < iLen; i++) {
+                    for (int i = 0, iLen = n.indices.length(); i < iLen; ++i) {
                         char c = n.indices.charAt(i);
                         if (c == idxc) {
                             if (n.wildChild) {
@@ -375,10 +367,10 @@ public class RouteNode {
                     if (!n.wildChild) {
                         // If the path at the end of the loop is not equal to '/' and the current node has no child nodes
                         // the current node needs to roll back to last valid skippedNode
-                        if (!path.equals("/")) {
-                            for (int length = skippedNodes.size(); length > 0; length--) {
-                                SkippedNode skippedNode = skippedNodes.get(length - 1);
-                                skippedNodes.remove(length - 1);
+                        if (!"/".equals(path)) {
+                            for (int len = skippedNodes.size(); len > 0; --len) {
+                                SkippedNode skippedNode = skippedNodes.get(len - 1);
+                                skippedNodes.remove(len - 1);
                                 if (skippedNode.getPath().endsWith(path)) {
                                     path = skippedNode.getPath();
                                     n = skippedNode.getNode();
@@ -391,7 +383,7 @@ public class RouteNode {
                             }
                         }
 
-                        value.tsr = path.equals("/") && n.handlers != null;
+                        value.tsr = "/".equals(path) && n.handlers != null;
                         return value;
                     }
 
@@ -438,9 +430,10 @@ public class RouteNode {
                                 value.fullPath = n.fullPath;
                                 return value;
                             }
+
                             if (n.children.size() == 1) {
                                 n = n.children.get(0);
-                                value.tsr = (n.path.equals("/") && n.handlers != null) || (n.path.isEmpty() && n.indices.equals("/"));
+                                value.tsr = ("/".equals(n.path) && n.handlers != null) || (n.path.isEmpty() && "/".equals(n.indices));
                             }
                             return value;
 
@@ -449,7 +442,6 @@ public class RouteNode {
                                 if (value.params == null) {
                                     value.params = params;
                                 }
-                                //int i = value.params.size();
                                 String val = path;
                                 if (unescape) {
                                     try {
@@ -465,18 +457,19 @@ public class RouteNode {
                             return value;
 
                         default:
-                            throw new IllegalStateException("Invalid node type");
+                            throw new RouteSyntaxException("Invalid node type");
                     }
                 }
             }
 
             if (path.equals(prefix)) {
-                // If the current path does not equal '/' and the node does not have a registered handle and the most recently matched node has a child node
+                // If the current path does not equal '/' and the node does not have a registered handle
+                // and the most recently matched node has a child node
                 // the current node needs to roll back to last valid skippedNode
-                if (n.handlers == null && !path.equals("/")) {
-                    for (int length = skippedNodes.size(); length > 0; length--) {
-                        SkippedNode skippedNode = skippedNodes.get(length - 1);
-                        skippedNodes.remove(length - 1);
+                if (n.handlers == null && !"/".equals(path)) {
+                    for (int len = skippedNodes.size(); len > 0; --len) {
+                        SkippedNode skippedNode = skippedNodes.get(len - 1);
+                        skippedNodes.remove(len - 1);
                         if (skippedNode.path.endsWith(path)) {
                             path = skippedNode.path;
                             n = skippedNode.node;
@@ -500,17 +493,17 @@ public class RouteNode {
                 // If there is no handle for this route, but this route has a
                 // wildcard child, there must be a handle for this path with an
                 // additional trailing slash
-                if (path.equals("/") && n.wildChild && n.nType != NodeType.ROOT) {
+                if ("/".equals(path) && n.wildChild && n.nType != NodeType.ROOT) {
                     value.tsr = true;
                     return value;
                 }
 
-                if (path.equals("/") && n.nType == NodeType.STATIC) {
+                if ("/".equals(path) && n.nType == NodeType.STATIC) {
                     value.tsr = true;
                     return value;
                 }
 
-                for (int i = 0; i < n.indices.length(); i++) {
+                for (int i = 0, len = n.indices.length(); i < len; ++i) {
                     if (n.indices.charAt(i) == '/') {
                         n = n.children.get(i);
                         value.tsr = (n.path.length() == 1 && n.handlers != null) ||
@@ -518,18 +511,16 @@ public class RouteNode {
                         return value;
                     }
                 }
-
                 return value;
             }
 
-            value.tsr = path.equals("/") ||
-                (prefix.length() == path.length() + 1 && prefix.charAt(path.length()) == '/' &&
+            value.tsr = "/".equals(path) || (prefix.length() == path.length() + 1 && prefix.charAt(path.length()) == '/' &&
                     path.equals(prefix.substring(0, prefix.length() - 1)) && n.handlers != null);
 
-            if (!value.tsr && !path.equals("/")) {
-                for (int length = skippedNodes.size(); length > 0; length--) {
-                    SkippedNode skippedNode = skippedNodes.get(length - 1);
-                    skippedNodes.remove(length - 1);
+            if (!value.tsr && !"/".equals(path)) {
+                for (int len = skippedNodes.size(); len > 0; --len) {
+                    SkippedNode skippedNode = skippedNodes.get(len - 1);
+                    skippedNodes.remove(len - 1);
                     if (skippedNode.path.endsWith(path)) {
                         path = skippedNode.path;
                         n = skippedNode.node;
