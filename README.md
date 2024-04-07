@@ -7,4 +7,31 @@
 - 命名参数动态路由：`/api/users/:userId`
 - 通配符参数动态路由：`/api/actions/*actionName`
 
-用法参见：`ExampleTest.java`
+用法：
+```
+Router router = new Router();
+// 注册URL路由
+router.get("/api/users", HandlersChain);
+router.get("/api/users/:userId", HandlersChain);
+router.post("/api/users", HandlersChain);
+router.put("/api/users/:userId", HandlersChain);
+
+// 测试路由匹配
+RouteInfo routeInfo = router.match("GET", "/api/users");
+System.out.println(routeInfo);
+
+routeInfo = router.match("GET", "/api/users/10010");
+System.out.println(routeInfo);
+
+routeInfo = router.match("POST", "/api/users");
+System.out.println(routeInfo);
+
+routeInfo = router.match("PUT", "/api/users/10010");
+System.out.println(routeInfo);
+
+routeInfo = router.match("DELETE", "/api/users/10010");
+System.out.println(routeInfo);
+
+```
+
+测试用例参见：`ExampleTest.java`
