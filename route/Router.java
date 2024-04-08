@@ -62,7 +62,10 @@ public class Router {
             });
         }
 
-        root.addRoute(routePath, handlers);
+        // 保证并发安全
+        synchronized (root) {
+            root.addRoute(routePath, handlers);
+        }
         return this;
     }
 
