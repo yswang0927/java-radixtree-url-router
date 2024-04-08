@@ -1,16 +1,16 @@
 package route;
 
 /**
- * 路由语法异常
+ * 路由异常
  *
  * @author wangyongshan
  */
-public class RouteSyntaxException extends RuntimeException {
-    public RouteSyntaxException() {
+public class RouteException extends RuntimeException {
+    public RouteException() {
         super();
     }
 
-    public RouteSyntaxException(String message) {
+    public RouteException(String message) {
         super(message);
     }
 
@@ -29,4 +29,3 @@ public class RouteSyntaxException extends RuntimeException {
         // ignore
     }
 }
-

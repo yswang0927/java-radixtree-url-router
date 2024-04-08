@@ -35,19 +35,15 @@ public class RouteNode {
         this.fullPath = fullPath == null ? "" : fullPath;
     }
 
-    public void addChild(RouteNode child) {
-        if (this.wildChild && this.children.size() > 0) {
-            RouteNode wildcardChild = this.children.get(this.children.size() - 1);
-            this.children.remove(children.size() - 1);
-            this.children.add(child);
-            this.children.add(wildcardChild);
-        } else {
-            this.children.add(child);
-        }
-    }
-
-    public void addRoute(String path, HandlersChain handlers) {
-        if (path == null) {
+    /**
+     * 添加路由
+     *
+     * @param path 路由路径
+     * @param handlers 路由处理器
+     * @throws RouteException 如果出现路由语法错误、路由定义冲突等会抛出此异常
+     */
+    public void addRoute(String path, HandlersChain handlers) throws RouteException {
+        if (path == null || path.isEmpty()) {
             return;
         }
 
@@ -143,7 +139,7 @@ public class RouteNode {
                         pathSeg = path.split("/", 2)[0];
                     }
                     String prefix = fullPath.substring(0, fullPath.indexOf(pathSeg)) + n.path;
-                    throw new RouteConflictException(String.format("'%s' in new path '%s' conflicts with existing wildcard '%s' in existing prefix '%s'", pathSeg, fullPath, n.path, prefix));
+                    throw new RouteException(String.format("'%s' in new path '%s' conflicts with existing wildcard '%s' in existing prefix '%s'", pathSeg, fullPath, n.path, prefix));
                 }
 
                 n.insertChild(path, fullPath, handlers);
@@ -152,11 +148,22 @@ public class RouteNode {
 
             // Otherwise add handle to current node
             if (n.handlers != null) {
-                throw new RouteConflictException("handlers are already registered for path '" + fullPath + "'");
+                throw new RouteException("handlers are already registered for path '" + fullPath + "'");
             }
             n.handlers = handlers;
             n.fullPath = fullPath;
             return;
+        }
+    }
+
+    private void addChild(RouteNode child) {
+        if (this.wildChild && this.children.size() > 0) {
+            RouteNode wildcardChild = this.children.get(this.children.size() - 1);
+            this.children.remove(children.size() - 1);
+            this.children.add(child);
+            this.children.add(wildcardChild);
+        } else {
+            this.children.add(child);
         }
     }
 
@@ -199,12 +206,12 @@ public class RouteNode {
 
             // The wildcard name must only contain one ':' or '*' character
             if (!valid) {
-                throw new RouteSyntaxException(String.format("only one wildcard per path segment is allowed, has: '%s' in path '%s'", wildcard, fullPath));
+                throw new RouteException(String.format("only one wildcard per path segment is allowed, has: '%s' in path '%s'", wildcard, fullPath));
             }
 
             // check if the wildcard has a name
             if (wildcard.length() < 2) {
-                throw new RouteSyntaxException(String.format("wildcards must be named with a non-empty name in path '%s'", fullPath));
+                throw new RouteException(String.format("wildcards must be named with a non-empty name in path '%s'", fullPath));
             }
 
             if (wildcard.charAt(0) == ':') { // param
@@ -242,7 +249,7 @@ public class RouteNode {
 
             // catchAll
             if (i + wildcard.length() != path.length()) {
-                throw new RouteSyntaxException(String.format("catch-all routes are only allowed at the end of the path in path '%s'", fullPath));
+                throw new RouteException(String.format("catch-all routes are only allowed at the end of the path in path '%s'", fullPath));
             }
 
             if (!n.path.isEmpty() && n.path.charAt(n.path.length() - 1) == '/') {
@@ -250,14 +257,14 @@ public class RouteNode {
                 if (!n.children.isEmpty()) {
                     pathSeg = n.children.get(0).path.split("/", 2)[0];
                 }
-                throw new RouteConflictException(String.format("catch-all wildcard '%s' in new path '%s' conflicts with existing path segment '%s in existing prefix '%s%s'",
+                throw new RouteException(String.format("catch-all wildcard '%s' in new path '%s' conflicts with existing path segment '%s in existing prefix '%s%s'",
                     path, fullPath, pathSeg, n.path, pathSeg));
             }
 
             // currently fixed width 1 for '/'
             i--;
             if (path.charAt(i) != '/') {
-                throw new RouteSyntaxException(String.format("no / before catch-all in path '%s'", fullPath));
+                throw new RouteException(String.format("no / before catch-all in path '%s'", fullPath));
             }
 
             n.path = path.substring(0, i);
@@ -457,7 +464,7 @@ public class RouteNode {
                             return value;
 
                         default:
-                            throw new RouteSyntaxException("Invalid node type");
+                            throw new RouteException("Invalid node type");
                     }
                 }
             }
@@ -669,7 +676,7 @@ public class RouteNode {
                 case CATCH_ALL:
                     return ciPath.concat(path);
                 default:
-                    throw new RouteSyntaxException("Invalid node type");
+                    throw new RouteException("Invalid node type");
             }
         }
 
@@ -694,31 +701,19 @@ public class RouteNode {
         return path;
     }
 
-    public void setPath(String path) {
-        this.path = path;
-    }
-
     public String getIndices() {
         return indices;
-    }
-
-    public void setIndices(String indices) {
-        this.indices = indices;
     }
 
     public boolean isWildChild() {
         return wildChild;
     }
 
-    public void setWildChild(boolean wildChild) {
-        this.wildChild = wildChild;
-    }
-
-    public NodeType getnType() {
+    public NodeType getNodeType() {
         return nType;
     }
 
-    public void setnType(NodeType nType) {
+    public void setNodeType(NodeType nType) {
         this.nType = nType;
     }
 
@@ -726,24 +721,12 @@ public class RouteNode {
         return priority;
     }
 
-    public void setPriority(int priority) {
-        this.priority = priority;
-    }
-
     public List<RouteNode> getChildren() {
         return children;
     }
 
-    public void setChildren(List<RouteNode> children) {
-        this.children = children;
-    }
-
-    public HandlersChain getHandlers() {
+    public HandlersChain getHandlersChain() {
         return handlers;
-    }
-
-    public void setHandlers(HandlersChain handlers) {
-        this.handlers = handlers;
     }
 
     public String getFullPath() {
