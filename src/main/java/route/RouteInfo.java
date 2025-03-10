@@ -6,11 +6,11 @@ package route;
  * @author wangyongshan
  */
 public class RouteInfo {
-    String method = "";
-    String fullPath = "";
+    String method;
+    String fullPath;
     Params params = new Params();
     HandlersChain handlers;
-    boolean tsr;
+    boolean tsr; // (trailing slash redirect)
 
     RouteInfo() {
     }

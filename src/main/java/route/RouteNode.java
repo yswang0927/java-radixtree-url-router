@@ -21,7 +21,7 @@ public class RouteNode {
     HandlersChain handlers;
     List<RouteNode> children = new ArrayList<>();
 
-    RouteNode() {}
+    public RouteNode() {}
 
     RouteNode(String path, String indices, boolean wildChild, NodeType nType, int priority,
                      List<RouteNode> children, HandlersChain handlers, String fullPath) {
@@ -263,7 +263,8 @@ public class RouteNode {
 
             // currently fixed width 1 for '/'
             i--;
-            if (path.charAt(i) != '/') {
+            // 2025/3/10 根据最新版的tree.go增加 `i < 0` 条件
+            if (i < 0 || path.charAt(i) != '/') {
                 throw new RouteException(String.format("no / before catch-all in path '%s'", fullPath));
             }
 
@@ -308,9 +309,27 @@ public class RouteNode {
     }
 
     private FoundWildcard findWildcard(String path) {
+        // 2025/3/10 根据最新版的tree.go增加支持url中含有冒号(:)，要使用 \ 转义符
+        boolean escapeColon = false;
+
         // Find start
         for (int start = 0; start < path.length(); start++) {
             char c = path.charAt(start);
+
+            // --- 2025/3/10 增加支持url中含有冒号(:) ---
+            if (escapeColon) {
+                escapeColon = false;
+                if (c == ':') {
+                    continue;
+                }
+                throw new RouteException("invalid escape string in path '" + path + "'");
+            }
+            if (c == '\\') {
+                escapeColon = true;
+                continue;
+            }
+            //-----------------------
+
             // A wildcard starts with ':' (param) or '*' (catch-all)
             if (c != ':' && c != '*') {
                 continue;
@@ -331,6 +350,12 @@ public class RouteNode {
         return new FoundWildcard("", -1, false);
     }
 
+    /**
+     * Returns the handle registered with the given path (key).
+     * The values of wildcards are saved to a map.
+     * If no handle can be found, a TSR (trailing slash redirect) recommendation is made
+     * if a handle exists with an extra (without the) trailing slash for the given path.
+     */
     public RouteInfo getValue(String path, Params params, List<SkippedNode> skippedNodes, boolean unescape) {
         RouteInfo value = new RouteInfo();
         int globalParamsCount = 0;
@@ -390,6 +415,9 @@ public class RouteNode {
                             }
                         }
 
+                        // Nothing found.
+                        // We can recommend to redirect to the same URL without a
+                        // trailing slash if a leaf exists for that path.
                         value.tsr = "/".equals(path) && n.handlers != null;
                         return value;
                     }
@@ -521,9 +549,12 @@ public class RouteNode {
                 return value;
             }
 
+            // Nothing found. We can recommend to redirect to the same URL with an
+            // extra trailing slash if a leaf exists for that path
             value.tsr = "/".equals(path) || (prefix.length() == path.length() + 1 && prefix.charAt(path.length()) == '/' &&
                     path.equals(prefix.substring(0, prefix.length() - 1)) && n.handlers != null);
 
+            // roll back to last valid skippedNode
             if (!value.tsr && !"/".equals(path)) {
                 for (int len = skippedNodes.size(); len > 0; --len) {
                     SkippedNode skippedNode = skippedNodes.get(len - 1);
@@ -548,6 +579,12 @@ public class RouteNode {
         return this.getValue(path, new Params(), new ArrayList<>(), unescape);
     }
 
+    /**
+     * Makes a case-insensitive lookup of the given path and tries to find a handler.
+     * It can optionally also fix trailing slashes.
+     * It returns the case-corrected path and a bool indicating whether the lookup
+     * was successful.
+     */
     public String findCaseInsensitivePath(String path, boolean fixTrailingSlash) {
         return findCaseInsensitivePathRec(path, "", fixTrailingSlash);
     }

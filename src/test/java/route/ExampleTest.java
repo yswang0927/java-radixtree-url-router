@@ -749,8 +749,8 @@ public class ExampleTest {
     private static void testTreeFindCaseInsensitivePath() {
         RouteNode tree = new RouteNode();
 
-        String longPath = "/l" + "o".repeat(128) + "ng";
-        String lOngPath = "/l" + "O".repeat(128) + "ng/";
+        String longPath = "/l" + strRepeat("o", 128) + "ng";
+        String lOngPath = "/l" + strRepeat("O", 128) + "ng/";
 
         String[] routes = {
             "/hi",
@@ -986,5 +986,13 @@ public class ExampleTest {
         }
         // 返回随机单词
         return wordBuilder.toString();
+    }
+
+    private static String strRepeat(String str, int repeats) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < repeats; i++) {
+            sb.append(str);
+        }
+        return sb.toString();
     }
 }
